@@ -43,18 +43,9 @@ import {
   validateApplication,
 } from "../shared/schema.js";
 import { readDraft, saveDraft, clearDraft } from "./drafts.js";
+import { api } from "./api.js";
 import "./styles.css";
 
-export async function api(url, options = {}) {
-  const r = await fetch("/api" + url, {
-    ...options,
-    headers: { "Content-Type": "application/json", ...options.headers },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.error || "Something went wrong.");
-  return d;
-}
 const symbols = {
   leaf: Leaf,
   brain: Brain,
@@ -1047,7 +1038,10 @@ function App() {
     [selected, setSelected] = useState(null);
   const refresh = () =>
     api("/startups")
-      .then(setStartups)
+      .then((data) => {
+        setStartups(data);
+        setError("");
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   useEffect(() => {

@@ -42,3 +42,9 @@ The initial six showcase ventures are clearly labeled illustrative demo content.
 Deploy the Node server with a persistent disk, Node 24+, HTTPS, and `COOKIE_SECURE=true`. Set `PORT` if needed. `DATA_DIR` defaults to `.data` and contains the SQLite database; keep it private and back it up. Images are stored in the database, limited to PNG/JPEG/WebP, 2 MB per image and three product images. Local drafts may exceed device storage with many images; the interface reports when local saving fails. Submitted records remain persisted server-side.
 
 This project is built and tested locally; no public deployment or email delivery is configured. Production operations should add institution-managed account provisioning/recovery, backups, monitoring, and an event-specific retention policy. Founder access codes must be saved by the applicant; no automated email recovery is included.
+
+## Vercel preview deployment
+
+`vercel.json` selects `npm run build:preview` and the `dist` output directory. This explicit preview mode bundles the six labeled demo ventures and supports startup discovery and detail views without a backend. Submissions and organizer access show an explanatory message; they never report false success. Local application drafts still save on the device.
+
+The normal `npm run build` and `npm start` commands retain the complete Express/SQLite application. A full Vercel deployment still requires adapting the API and connecting persistent hosted storage.
