@@ -55,9 +55,11 @@ export function databaseConfig(env = process.env) {
       ? false
       : {
           rejectUnauthorized: true,
-          ...(env.SUPABASE_SSL_CA_FILE
-            ? { ca: readFileSync(env.SUPABASE_SSL_CA_FILE, "utf8") }
-            : {}),
+          ...(env.SUPABASE_SSL_CA
+            ? { ca: env.SUPABASE_SSL_CA.replace(/\\n/g, "\n") }
+            : env.SUPABASE_SSL_CA_FILE
+              ? { ca: readFileSync(env.SUPABASE_SSL_CA_FILE, "utf8") }
+              : {}),
         },
     max: 5,
     connectionTimeoutMillis: 10000,

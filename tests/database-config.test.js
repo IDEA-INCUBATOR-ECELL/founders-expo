@@ -26,3 +26,16 @@ test("remote database TLS verification cannot be disabled through the URL", () =
     false,
   );
 });
+
+test("hosted PEM certificate accepts escaped newlines and takes priority over local paths", () => {
+  const pem = "-----BEGIN CERTIFICATE-----\nexample\n-----END CERTIFICATE-----";
+  for (const value of [pem, pem.replaceAll("\n", "\\n")]) {
+    const config = databaseConfig({
+      SUPABASE_DB_URL: "postgresql://user:secret@example.com/postgres",
+      SUPABASE_SSL_CA: value,
+      SUPABASE_SSL_CA_FILE: "missing-local-certificate.crt",
+    });
+    assert.equal(config.ssl.ca, pem);
+    assert.equal(config.ssl.rejectUnauthorized, true);
+  }
+});
