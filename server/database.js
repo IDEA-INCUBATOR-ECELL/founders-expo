@@ -33,7 +33,7 @@ const unpack = (row) =>
 export class StorageUnavailable extends Error {
   constructor() {
     super(
-      "Submissions are temporarily unavailable. Your draft is safe on this device. Please retry once the database is connected.",
+      "The service is temporarily unavailable. Keep this page open and try again shortly.",
     );
     this.status = 503;
   }

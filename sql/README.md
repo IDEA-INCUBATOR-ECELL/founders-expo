@@ -29,7 +29,7 @@ Official references: [database connections](https://supabase.com/docs/guides/dat
 
 The importer first creates a consistent SQLite backup under the ignored `.data/backups/` directory. It imports **all recognized source tables**, verifies every source ID and JSON field in one PostgreSQL transaction, refuses unknown tables and conflicting records, and rolls back on any mismatch. It detects source changes during import. It never deletes or overwrites the source database. A rerun skips identical records and rejects different records rather than replacing them. Resolve conflicts deliberately before retrying. Keep the original database and backup until you verify the new project.
 
-Do not start an empty Supabase application server before migration: startup provisioning would create another organizer account. If there are no local records to migrate, configure `ADMIN_EMAIL` and `ADMIN_PASSWORD` before the first launch, or use the generated private credentials file.
+Do not start an empty Supabase application server before migration: startup provisioning would create another organizer account. If there are no local records to migrate, configure `ADMIN_EMAIL` and `ADMIN_PASSWORD` before the first launch, using your chosen admin credentials.
 
 ## Data map
 
@@ -58,15 +58,15 @@ The complete submitted JSON is the canonical record, so changing form fields can
 
 - A submission is successful only after PostgreSQL commits its complete application, related rows and receipt.
 - Repeated or concurrent requests using the same retry key return the same reference and tracking code; changed payloads cannot reuse that key.
-- The browser keeps an IndexedDB recovery copy until a confirmed response is saved. The recovery panel can retry pending applications, ideas, feedback and introductions, including after reload. Definitive validation errors are marked as needing correction, not as saved.
+- Form data and retry keys stay only in current-page memory. The browser writes no drafts or submissions to localStorage or IndexedDB. A confirmed submission is saved in Supabase.
 - Approval, public profile and stall assignment update atomically. A database unique index prevents simultaneous duplicate stall assignments.
 - Admin queries use PostgreSQL directly with no 1,000-row Data API cap. The dashboard refreshes every 20 seconds while visible and offers manual refresh. Failed refreshes show errors and do not claim a new sync time.
 - Without Supabase configuration, the API reports unavailability and accepts no submissions. It never silently falls back to SQLite. Existing SQLite files are migration sources only.
-- Recovery drafts are device-local, not a cloud backup. Pending data cannot reach Supabase until connectivity is restored. Keep the page/draft and use Retry; do not clear browser storage before saving the receipt.
+- Unsubmitted forms are not persisted. Keep the page open until a successful response, then save the reference and tracking code yourself.
 
 ## Hosting and backups
 
-The backend needs a running Node 24+ service with the environment above. The existing static Vercel preview is not a submission backend; it refuses submission rather than reporting false success. Use `npm run build` and `npm start` on a Node host for the full application. Enable `COOKIE_SECURE=true` behind HTTPS.
+The backend runs on Vercel through api/[...path].js or on a Node 24+ service. Use the production variables in VERCEL_ENV.md and COOKIE_SECURE=true behind HTTPS. Vercel builds the live frontend and deploys the API in the same project.
 
 Configure Supabase backups / point-in-time recovery according to your project plan and test restoration. Application transactions and retry receipts prevent partial/duplicate writes; they are not a guarantee against database deletion or loss of device-only drafts. No external project, backup schedule or hosted environment is configured by the SQL file itself.
 

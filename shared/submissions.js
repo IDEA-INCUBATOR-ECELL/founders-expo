@@ -31,7 +31,9 @@ export const isUpload = (value) =>
   value &&
   typeof value === "object" &&
   typeof value.data === "string" &&
-  /^data:(image\/(png|jpeg|webp)|application\/pdf);base64,/.test(value.data);
+  (/^data:(image\/(png|jpeg|webp)|application\/pdf);base64,/.test(value.data) ||
+    (value.data.startsWith("/api/admin/files/") &&
+      /^(image\/(png|jpeg|webp)|application\/pdf)$/.test(value.mimeType)));
 export function submissionSections(record) {
   const isApplication =
     record.founderName !== undefined || String(record.id).startsWith("MGIT-");

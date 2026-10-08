@@ -82,7 +82,7 @@ before(async () => {
   testDatabaseUrl = baseUrl.toString();
   testPool = new Pool({ connectionString: testDatabaseUrl });
   await testPool.query(readFileSync("sql/001_supabase_schema.sql", "utf8"));
-  server = spawn(process.execPath, ["server/index.js", "--production"], {
+  server = spawn(process.execPath, ["tests/fixtures/serverless.mjs"], {
     env: {
       ...process.env,
       PORT: "5199",
@@ -835,5 +835,43 @@ test("SQLite import verifies every record, preserves uploads and can rerun safel
       )
     ).rows[0].name,
     "Changed in Supabase",
+  );
+});
+
+test("media links keep listings small and enforce public approval and admin access", async () => {
+  const login = await request("/login", {
+    method: "POST",
+    body: { email: "test@mgit.ac.in", password: "test-only-password" },
+  });
+  cookie = login.headers.get("set-cookie").split(";")[0];
+  const records = (
+    await request("/admin", {
+      auth: true,
+      headers: { "X-Expo-Media": "links" },
+    })
+  ).data;
+  const record = records.applications.find((a) => a.logo?.data);
+  assert.ok(record.logo.data.startsWith("/api/admin/files/"));
+  const logoUrl = "http://localhost:5199" + record.logo.data;
+  assert.equal((await fetch(logoUrl)).status, 401);
+  const logo = await fetch(logoUrl, { headers: { Cookie: cookie } });
+  assert.equal(logo.status, 200);
+  assert.ok(logo.headers.get("content-type").includes("image/png"));
+  const publicRecords = (
+    await request("/startups", { headers: { "X-Expo-Media": "links" } })
+  ).data;
+  const profile = publicRecords.find((a) => a.logo?.data);
+  assert.ok(profile.logo.data.startsWith("/api/startups/"));
+  assert.equal(
+    (await fetch("http://localhost:5199" + profile.logo.data)).status,
+    200,
+  );
+  assert.equal(
+    (
+      await fetch(
+        "http://localhost:5199/api/startups/" + application.id + "/files/logo",
+      )
+    ).status,
+    404,
   );
 });

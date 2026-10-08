@@ -9,7 +9,6 @@
     "start": "node server/index.js --production",
     "test": "node --env-file-if-exists=.env.test --test tests/*.test.js",
     "format": "prettier --write src server shared tests package.json index.html README.md",
-    "build:preview": "vite build --mode preview",
     "db:setup": "node scripts/setup-database.mjs",
     "db:migrate": "node scripts/migrate-sqlite.mjs",
     "db:check": "node scripts/check-database.mjs",
@@ -26,5 +25,8 @@
   },
   "devDependencies": {
     "prettier": "^3.9.9"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

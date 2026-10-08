@@ -24,13 +24,13 @@ npm test
 
 ## Organizer access
 
-On first start, a unique organizer password is generated and saved to `.data/organizer-credentials.txt`. Use those credentials at `/#admin` (the existing `/#organizer` route also works). Each application opens a complete review with an **Accept & publish** action, status/stall controls, original uploads, and authenticated Markdown/PDF downloads. Idea, rapid-fire, feedback and team-introduction records also have full detail views and downloads. PDF exports use bundled DejaVu fonts, with their license in `server/fonts/`. The credentials and database are excluded from git. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` before the first startup to provision your own credentials instead. These settings do not overwrite an existing user.
+Set ADMIN_EMAIL and ADMIN_PASSWORD before the first launch against an empty database. Existing accounts, including the migrated admin credentials, are preserved. Sign in at /#admin or /#organizer from any device using the same credentials. Accounts and sessions are stored in Supabase; the browser receives an HttpOnly secure session cookie on HTTPS. The backend does not write application data or generated passwords to local files. Each application has full review, Accept & publish, original uploads, and authenticated Markdown/PDF downloads.
 
 ## Included flows
 
 - Searchable startup showcase with category, stage, product availability, and hiring filters.
 - Accessible startup detail dialogs, private structured feedback, and team introductions.
-- Four-step application form with startup name, one-line idea, display choices (including a conditional Other response), mandatory startup logo, leader contact and college emails, team size with additional member contact fields, and stall requirements. Includes IndexedDB draft persistence, upload validation, review and unique reference/access codes.
+- Four-step application form with startup name, one-line idea, display choices (including a conditional Other response), mandatory startup logo, leader contact and college emails, team size with additional member contact fields, and stall requirements. Includes upload validation, review and unique reference/access codes. The form is held only in page memory until submission; no drafts, receipts or submissions are written to localStorage or IndexedDB.
 - Private founder application tracking and feedback inbox at `/#status`.
 - Separate original ideas and rapid-fire submissions. Organizers publish real NEC problem statements.
 - Authenticated application review, approve/reject, internal notes, unique stall assignment, requirements review, and CSV export.
@@ -42,12 +42,14 @@ Accepted startup cards show the uploaded logo, startup name, one-line idea and l
 
 The public showcase shows “Coming soon...” until an admin accepts and publishes an application, including when the database is unavailable. Background refreshes reveal approved startups automatically and preserve already loaded profiles during a temporary connection failure. Submission and admin pages still report errors when an action cannot be saved. Illustrative demo profiles are removed automatically on startup, and no demo records are seeded. Real submissions and approved startup profiles are preserved.
 
-Deploy the Node server with Node 24+, HTTPS, Supabase connection variables and `COOKIE_SECURE=true`. Application records, sessions and uploads persist in Supabase. The `.data` directory is used only for local credentials and migration backups. See [sql/README.md](sql/README.md) for data protection and recovery details.
+Deploy the Node server with Node 24+, HTTPS, Supabase connection variables and `COOKIE_SECURE=true`. Application records, sessions and uploads persist in Supabase. Existing local files are retained only as migration sources, backups and private configuration. New application data goes to Supabase. See [sql/README.md](sql/README.md) for data protection and recovery details.
 
-This project is built and tested locally; no public deployment or email delivery is configured. Production operations should add institution-managed account provisioning/recovery, backups, monitoring, and an event-specific retention policy. Founder access codes must be saved by the applicant; no automated email recovery is included.
+The repository is configured for live Vercel deployment. Email delivery is not configured. Production operations should add institution-managed account provisioning/recovery, backups, monitoring, and an event-specific retention policy. Founder access codes must be saved by the applicant; no automated email recovery is included.
 
-## Vercel preview deployment
+## Live Vercel deployment
 
-`vercel.json` selects `npm run build:preview` and the `dist` output directory. This explicit preview mode shows the “Coming soon...” showcase without demo ventures. Submissions and organizer access show an explanatory message; they never report false success. Local application drafts still save on the device.
+Vercel builds the live frontend using npm run build and serves /api/* through api/[...path].js. Both local development and Vercel use server/app.js. Set the production variables described in [VERCEL_ENV.md](VERCEL_ENV.md), then redeploy. /api/health must return HTTP 200 with ready: true and storage: supabase.
 
-The normal `npm run build` and `npm start` commands run the complete Express/Supabase application. The static preview does not host this API; deploy the Node backend separately for live submissions.
+The private .env.vercel file is excluded from Git and deployment uploads. Node 24 is required. PDF fonts are included in the API bundle. The API performs no local filesystem writes. Logo and original-file links keep normal public/admin responses small; private files require an admin session. The complete submission request is limited to 4 MB for Vercel compatibility.
+
+Unsubmitted form data lives only in the current page. Keep the page open until submission is confirmed, and save the reference and private tracking code yourself. Retry keys stay in page memory to avoid duplicate submissions after a temporary network failure; committed records and receipts are in Supabase.

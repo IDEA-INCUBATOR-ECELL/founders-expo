@@ -44,9 +44,7 @@ import {
   memberFields,
   validateApplication,
 } from "../shared/schema.js";
-import { readDraft, saveDraft, clearDraft } from "./drafts.js";
 import { api } from "./api.js";
-import { SubmissionRecovery } from "./SubmissionRecovery.jsx";
 import "./styles.css";
 import {
   submissionSections,
@@ -1201,7 +1199,6 @@ function App() {
           </button>
         </div>
       </header>
-      <SubmissionRecovery />
       <main>
         {home ? (
           <Home startups={startups} onOpen={setSelected} loading={loading} />
@@ -1513,30 +1510,12 @@ function TeamReview({ members = [] }) {
   ));
 }
 function Registration() {
-  const [data, setData] = useState(null),
+  const [data, setData] = useState(() => ({ teamSize: "1", members: [] })),
     [step, setStep] = useState(0),
     [errors, setErrors] = useState({}),
     [error, setError] = useState(""),
-    [saved, setSaved] = useState(true),
     [busy, setBusy] = useState(false),
     [result, setResult] = useState(null);
-  useEffect(() => {
-    readDraft().then(setData);
-  }, []);
-  useEffect(() => {
-    if (!data || result) return;
-    let current = true;
-    saveDraft(data)
-      .then(() => {
-        if (current) setSaved(true);
-      })
-      .catch(() => {
-        if (current) setSaved(false);
-      });
-    return () => {
-      current = false;
-    };
-  }, [data, result]);
   const change = (k, v) => {
     setData((d) => {
       const updated = { ...d, [k]: v };
@@ -1585,10 +1564,6 @@ function Registration() {
     try {
       const r = await api("/applications", { method: "POST", body: data });
       setResult(r);
-      await clearDraft().catch(() => {});
-      try {
-        localStorage.setItem("mgit-application", JSON.stringify(r));
-      } catch {}
     } catch (e) {
       setError(e.message);
     } finally {
@@ -1678,9 +1653,8 @@ function Registration() {
           <div className="draft-note">
             <ShieldCheck size={18} />
             <p>
-              {saved
-                ? "Your progress is saved on this device. Come back when inspiration strikes."
-                : "Device storage is full. Keep this page open until submission."}
+              Your application is saved securely when you submit. Keep this page
+              open while completing the form.
             </p>
           </div>
         </aside>
@@ -1692,7 +1666,7 @@ function Registration() {
             </span>
             <span className="save-indicator">
               <span className="dot" />
-              {saved ? "Draft saved locally" : "Not saved"}
+              Submit to save
             </span>
           </div>
           <div className="progress-track">
@@ -1985,14 +1959,7 @@ function IdeaBox() {
   );
 }
 function ApplicationStatus() {
-  const [stored] = useState(() => {
-      try {
-        return JSON.parse(localStorage.getItem("mgit-application")) || {};
-      } catch {
-        return {};
-      }
-    }),
-    [result, setResult] = useState(null),
+  const [result, setResult] = useState(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   return (
@@ -2029,21 +1996,11 @@ function ApplicationStatus() {
       >
         <label>
           Application reference
-          <input
-            name="id"
-            defaultValue={stored.id}
-            placeholder="MGIT-…"
-            required
-          />
+          <input name="id" placeholder="MGIT-…" required />
         </label>
         <label>
           Private access code
-          <input
-            name="token"
-            type="password"
-            defaultValue={stored.token}
-            required
-          />
+          <input name="token" type="password" required />
         </label>
         <Button primary disabled={busy}>
           {busy ? "Checking…" : "Check application"} <ArrowRight size={16} />
@@ -2784,7 +2741,8 @@ function SubmissionDetails({ record }) {
                 download={file.name}
                 className="submission-upload"
               >
-                {file.data.startsWith("data:image/") && (
+                {(file.data.startsWith("data:image/") ||
+                  file.mimeType?.startsWith("image/")) && (
                   <img src={file.data} alt={file.label} />
                 )}
                 <span>
