@@ -48,7 +48,7 @@ The repository is configured for live Vercel deployment. Email delivery is not c
 
 ## Live Vercel deployment
 
-Vercel builds the live frontend using npm run build and serves /api/* through api/[...path].js. Both local development and Vercel use server/app.js. Set the production variables described in [VERCEL_ENV.md](VERCEL_ENV.md), then redeploy. /api/health must return HTTP 200 with ready: true and storage: supabase.
+Vercel builds the live frontend using npm run build and serves /api/* through api/index.js. Both local development and Vercel use server/app.js. Set the production variables described in [VERCEL_ENV.md](VERCEL_ENV.md), then redeploy. /api/health must return HTTP 200 with ready: true and storage: supabase.
 
 The private .env.vercel file is excluded from Git and deployment uploads. Node 24 is required. PDF fonts are included in the API bundle. The API performs no local filesystem writes. Logo and original-file links keep normal public/admin responses small; private files require an admin session. The complete submission request is limited to 4 MB for Vercel compatibility.
 

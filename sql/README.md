@@ -66,7 +66,7 @@ The complete submitted JSON is the canonical record, so changing form fields can
 
 ## Hosting and backups
 
-The backend runs on Vercel through api/[...path].js or on a Node 24+ service. Use the production variables in VERCEL_ENV.md and COOKIE_SECURE=true behind HTTPS. Vercel builds the live frontend and deploys the API in the same project.
+The backend runs on Vercel through api/index.js or on a Node 24+ service. Use the production variables in VERCEL_ENV.md and COOKIE_SECURE=true behind HTTPS. Vercel builds the live frontend and deploys the API in the same project.
 
 Configure Supabase backups / point-in-time recovery according to your project plan and test restoration. Application transactions and retry receipts prevent partial/duplicate writes; they are not a guarantee against database deletion or loss of device-only drafts. No external project, backup schedule or hosted environment is configured by the SQL file itself.
 

@@ -2,7 +2,7 @@
 
 The private, Git-ignored file `.env.vercel` contains the actual Supabase connection, CA certificate, and existing admin credentials. Do not commit it. Your local `.env` remains configured for localhost.
 
-**Live deployment:** vercel.json builds the production frontend and deploys the Express API through api/[...path].js. Add the production variables below and redeploy. The same Supabase admin credentials work from any device.
+**Live deployment:** vercel.json builds the production frontend and deploys the Express API through api/index.js. Add the production variables below and redeploy. The same Supabase admin credentials work from any device.
 
 ## Variables to add
 

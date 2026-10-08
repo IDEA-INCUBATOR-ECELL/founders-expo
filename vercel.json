@@ -9,5 +9,11 @@
       "maxDuration": 60,
       "includeFiles": "server/fonts/**"
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api"
+    }
+  ]
 }
