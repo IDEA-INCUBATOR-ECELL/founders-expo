@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createApi } from "../src/api.js";
-test("Vercel preview loads six labeled demo startups without backend requests", async () => {
+test("Vercel preview leaves the showcase empty without backend requests", async () => {
   const api = createApi({
     preview: true,
     fetcher: () => {
@@ -9,17 +9,7 @@ test("Vercel preview loads six labeled demo startups without backend requests", 
     },
   });
   const startups = await api("/startups");
-  assert.equal(startups.length, 6);
-  assert.ok(
-    startups.every(
-      (s) =>
-        s.isDemo &&
-        s.status === "Approved" &&
-        s.name &&
-        s.problem &&
-        s.members.length,
-    ),
-  );
+  assert.deepEqual(startups, []);
   assert.deepEqual(await api("/problems"), []);
 });
 test("preview never pretends to submit or authenticate", async () => {
@@ -66,4 +56,37 @@ test("malformed JSON is handled and API errors are preserved", async () => {
 test("live mode never replaces empty showcases with demo data", async () => {
   const api = createApi({ fetcher: async () => Response.json([]) });
   assert.deepEqual(await api("/startups"), []);
+});
+
+test("submission sends retry key and only confirms after the server response", async () => {
+  const completed = [];
+  const entry = { key: "saved_retry_key_123456" };
+  const store = {
+    prepare: async () => entry,
+    complete: async (e, r) => completed.push(r),
+  };
+  const api = createApi({
+    submissionStore: store,
+    fetcher: async (_url, options) => {
+      assert.equal(options.headers["Idempotency-Key"], entry.key);
+      return Response.json({ id: "MGIT-SAVED" });
+    },
+  });
+  assert.equal(
+    (await api("/applications", { method: "POST", body: { name: "Example" } }))
+      .id,
+    "MGIT-SAVED",
+  );
+  assert.equal(completed.length, 1);
+  const failing = createApi({
+    submissionStore: store,
+    fetcher: async () => {
+      throw Error("offline");
+    },
+  });
+  await assert.rejects(
+    failing("/applications", { method: "POST", body: { name: "Example" } }),
+    /Unable to reach/,
+  );
+  assert.equal(completed.length, 1);
 });

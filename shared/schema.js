@@ -28,121 +28,68 @@ export const roles = [
 ];
 export const steps = [
   {
-    title: "Founder details",
-    caption: "The people behind the possibility.",
-    fields: [
-      ["founderName", "Founder name", "text", true],
-      ["email", "Email address", "email", true],
-      ["phone", "Phone number", "tel", true],
-      ["department", "Department", "text", true],
-      [
-        "year",
-        "Year",
-        "select",
-        true,
-        [
-          "1st year",
-          "2nd year",
-          "3rd year",
-          "4th year",
-          "Postgraduate",
-          "Alumni",
-        ],
-      ],
-      ["founderCount", "Number of founders", "number", true],
-    ],
-  },
-  {
-    title: "Your startup",
-    caption: "Let’s give your idea a name.",
+    title: "Startup & display",
+    caption: "Introduce your startup and what you’ll bring to the expo.",
     fields: [
       ["name", "Startup name", "text", true],
-      ["tagline", "One-line description", "text", true],
-      ["category", "Startup category", "select", true, categories],
-      ["stage", "Startup stage", "select", true, stages],
-      ["logo", "Startup logo", "file", true],
-      ["website", "Website", "url"],
-      ["social", "Social profile URL", "url"],
-    ],
-  },
-  {
-    title: "Problem & solution",
-    caption: "Big possibilities begin with a real problem.",
-    fields: [
-      ["problem", "Problem statement", "textarea", true],
-      ["targetUsers", "Target users", "textarea", true],
-      ["alternatives", "Current alternatives", "textarea", true],
-      ["solution", "Proposed solution", "textarea", true],
-      ["value", "Unique value proposition", "textarea", true],
-    ],
-  },
-  {
-    title: "The product",
-    caption: "Show us what you’re building.",
-    fields: [
-      ["productDescription", "Product description", "textarea", true],
+      ["tagline", "One-line idea", "text", true],
       [
-        "productStatus",
-        "Current product status",
-        "select",
+        "display",
+        "What is used for the display?",
+        "checks",
         true,
-        ["Concept only", "In development", "Working prototype", "Live product"],
+        ["Prototype", "Poster", "Demo", "Other"],
       ],
-      ["demo", "Demo / product link", "url"],
-      ["prototype", "Prototype link", "url"],
-      ["images", "Product images", "files"],
-      ["video", "Video / demo link", "url"],
+      ["displayOther", "Other response", "text", true],
+      ["logo", "Startup logo", "file", true],
     ],
   },
   {
-    title: "The business",
-    caption: "From a promising idea to a lasting venture.",
+    title: "Leader & team",
+    caption:
+      "Team size includes the founder / team leader. Add contact details for each additional member.",
     fields: [
-      ["businessModel", "Business model", "textarea", true],
-      ["revenueModel", "Revenue model", "textarea", true],
-      ["customers", "Current users / customers", "text", true],
-      ["revenue", "Revenue (if applicable)", "text"],
-      ["market", "Market / target segment", "textarea", true],
+      ["founderName", "Founder/Team leader name", "text", true],
+      ["email", "Email ID", "email", true],
+      ["organization", "College/organization", "text", true],
+      ["phone", "Contact number (WhatsApp preferred)", "tel", true],
+      ["collegeEmail", "College email", "email", true],
+      ["teamSize", "Team size", "text", true],
+      ["members", "Additional team members", "members"],
     ],
   },
   {
-    title: "Meet the team",
-    caption: "Great things are built together.",
-    fields: [],
-  },
-  {
-    title: "Your expo stall",
-    caption: "We’ll help set the stage for your startup.",
+    title: "Stall requirements",
+    caption: "Let us know what your team needs at the stall.",
     fields: [
-      ["display", "What will you display at your stall?", "textarea", true],
       [
-        "demonstration",
-        "Product / prototype demonstration required?",
-        "boolean",
+        "stallRequirements",
+        "Stall requirements",
+        "checks",
+        false,
+        ["Table", "Power socket", "Wall space for posters"],
       ],
-      ["electricity", "Electricity required?", "boolean"],
-      ["table", "Table required?", "boolean"],
-      ["monitor", "Display / monitor required?", "boolean"],
-      ["internet", "Internet required?", "boolean"],
-      ["otherRequirements", "Other requirements", "textarea"],
-    ],
-  },
-  {
-    title: "Grow your team",
-    caption: "Your next collaborator could be here.",
-    fields: [
-      ["hiring", "Are you looking for team members?", "boolean"],
-      ["requiredRoles", "Required roles", "checks", false, roles],
-      ["requiredSkills", "Required skills", "text"],
-      ["openings", "Number of people required", "number"],
-      ["opportunity", "Describe the opportunity", "textarea"],
+      ["otherRequirements", "Other stall requirements", "textarea"],
     ],
   },
   {
     title: "Review & submit",
-    caption: "One last look before your next big beginning.",
+    caption: "Check your startup, team and stall details before submitting.",
     fields: [],
   },
+];
+export const fieldVisible = (key, data) =>
+  key === "displayOther"
+    ? Array.isArray(data.display) && data.display.includes("Other")
+    : key === "members"
+      ? Number(data.teamSize) > 1
+      : true;
+export const memberFields = [
+  ["name", "Full name", "text", true],
+  ["phone", "Contact number", "tel", true],
+  ["email", "Email ID", "email", true],
+  ["organization", "College/organization", "text"],
+  ["role", "Role in the startup", "text"],
 ];
 export const safeUrl = (value) => {
   try {
@@ -157,7 +104,25 @@ export function validateApplication(data) {
     return { application: "Submit a valid application." };
   for (const step of steps)
     for (const [key, label, type, required, options] of step.fields) {
+      if (!fieldVisible(key, data)) continue;
       const v = data[key];
+      if (
+        type === "checks" &&
+        ((required && (!Array.isArray(v) || !v.length)) ||
+          (v !== undefined &&
+            (!Array.isArray(v) || v.some((item) => !options.includes(item)))))
+      )
+        errors[key] = required
+          ? "Choose at least one listed option."
+          : "Choose only listed options.";
+      if (
+        type === "file" &&
+        required &&
+        (!v ||
+          typeof v.data !== "string" ||
+          !/^data:image\/(png|jpeg|webp);base64,/.test(v.data))
+      )
+        errors[key] = "Upload your startup logo (PNG, JPEG or WebP).";
       if (
         v !== undefined &&
         v !== null &&
@@ -165,6 +130,10 @@ export function validateApplication(data) {
         typeof v !== "string"
       ) {
         errors[key] = `${label} must be text.`;
+        continue;
+      }
+      if (type === "boolean" && required && v !== true) {
+        errors[key] = "Please confirm the declaration before continuing.";
         continue;
       }
       if (type === "boolean" && v !== undefined && typeof v !== "boolean") {
@@ -185,7 +154,8 @@ export function validateApplication(data) {
       if (v && type === "select" && !options.includes(v))
         errors[key] = "Choose a listed option.";
       if (
-        v &&
+        v !== undefined &&
+        v !== "" &&
         type === "number" &&
         (!Number.isInteger(Number(v)) || Number(v) < 1 || Number(v) > 100)
       )
@@ -194,20 +164,57 @@ export function validateApplication(data) {
         errors[key] = "Keep this answer under 6,000 characters.";
     }
   if (
-    !Array.isArray(data.members) ||
-    !data.members.length ||
-    data.members.length > 100 ||
-    data.members.some(
-      (m) =>
-        !m ||
-        ["name", "role", "skills"].some(
-          (k) => typeof m[k] !== "string" || !m[k].trim() || m[k].length > 6000,
-        ) ||
-        (m.profile && !safeUrl(m.profile)),
-    )
+    typeof data.teamSize !== "string" ||
+    !/^\d+$/.test(data.teamSize.trim()) ||
+    Number(data.teamSize) < 1 ||
+    Number(data.teamSize) > 100
   )
-    errors.members =
-      "Add at least one team member with a name, role and skills, and a valid profile URL if provided.";
+    errors.teamSize =
+      "Enter a whole number from 1 to 100, including the team leader.";
+  if (
+    Array.isArray(data.display) &&
+    data.display.includes("Other") &&
+    (typeof data.displayOther !== "string" || !data.displayOther.trim())
+  )
+    errors.displayOther = "Tell us what else you will display.";
+  const expectedMembers = Number(data.teamSize) - 1;
+  if (
+    Number.isInteger(expectedMembers) &&
+    expectedMembers >= 0 &&
+    expectedMembers < 100
+  ) {
+    if (
+      (expectedMembers > 0 || data.members !== undefined) &&
+      (!Array.isArray(data.members) || data.members.length !== expectedMembers)
+    ) {
+      errors.members =
+        "Add details for all " + expectedMembers + " additional team members.";
+    } else {
+      for (const [index, member] of (data.members || []).entries()) {
+        for (const [key, label, type, required] of memberFields) {
+          const value = member?.[key];
+          if (
+            (required && (typeof value !== "string" || !value.trim())) ||
+            (value !== undefined &&
+              (typeof value !== "string" || value.length > 500)) ||
+            (value &&
+              type === "email" &&
+              !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) ||
+            (value && type === "tel" && !/^\+?[\d\s()-]{8,20}$/.test(value))
+          ) {
+            errors.members =
+              "Team member " +
+              (index + 2) +
+              ": enter a valid " +
+              label.toLowerCase() +
+              ".";
+            break;
+          }
+        }
+        if (errors.members) break;
+      }
+    }
+  }
   if (
     data.images !== undefined &&
     (!Array.isArray(data.images) || data.images.length > 3)
@@ -228,5 +235,20 @@ export function validateApplication(data) {
       data.requiredRoles.some((r) => !roles.includes(r)))
   )
     errors.requiredRoles = "Choose valid team roles.";
+  if (
+    typeof data.relevantLinks === "string" &&
+    data.relevantLinks.trim() &&
+    data.relevantLinks
+      .split(/\r?\n/)
+      .filter((link) => link.trim())
+      .some((link) => !safeUrl(link.trim()))
+  )
+    errors.relevantLinks =
+      "Enter one complete http:// or https:// link per line.";
+  if (
+    data.documents !== undefined &&
+    (!Array.isArray(data.documents) || data.documents.length > 3)
+  )
+    errors.documents = "Upload up to 3 documents.";
   return errors;
 }

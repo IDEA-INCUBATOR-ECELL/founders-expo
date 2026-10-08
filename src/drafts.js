@@ -1,6 +1,14 @@
+import { steps } from "../shared/schema.js";
+const currentDraft = (data) =>
+  Object.fromEntries(
+    steps
+      .flatMap((step) => step.fields)
+      .map(([key]) => [key, data?.[key]])
+      .filter(([, value]) => value !== undefined),
+  );
 const initial = () => ({
-  members: [{ name: "", role: "", skills: "", profile: "" }],
-  founderCount: 1,
+  teamSize: "1",
+  members: [],
 });
 function database() {
   return new Promise((resolve, reject) => {
@@ -16,7 +24,8 @@ export async function readDraft() {
     return await new Promise((resolve, reject) => {
       const tx = db.transaction("drafts", "readonly");
       const request = tx.objectStore("drafts").get("application");
-      request.onsuccess = () => resolve(request.result || legacy());
+      request.onsuccess = () =>
+        resolve(currentDraft(request.result || legacy()));
       request.onerror = () => reject(request.error);
       tx.oncomplete = () => db.close();
     });
@@ -26,7 +35,9 @@ export async function readDraft() {
 }
 function legacy() {
   try {
-    return JSON.parse(localStorage.getItem("mgit-draft")) || initial();
+    return currentDraft(
+      JSON.parse(localStorage.getItem("mgit-draft")) || initial(),
+    );
   } catch {
     return initial();
   }

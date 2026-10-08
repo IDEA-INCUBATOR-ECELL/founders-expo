@@ -40,11 +40,19 @@ import {
   categories,
   stages,
   steps,
+  fieldVisible,
+  memberFields,
   validateApplication,
 } from "../shared/schema.js";
 import { readDraft, saveDraft, clearDraft } from "./drafts.js";
 import { api } from "./api.js";
+import { SubmissionRecovery } from "./SubmissionRecovery.jsx";
 import "./styles.css";
+import {
+  submissionSections,
+  isUpload,
+  fieldLabel,
+} from "../shared/submissions.js";
 
 const symbols = {
   leaf: Leaf,
@@ -385,6 +393,11 @@ function ProductArt({ startup: s, large = false }) {
     <div className={`product-art ${s.theme || "sky"} ${large ? "large" : ""}`}>
       {s.images?.[0]?.data ? (
         <img src={s.images[0].data} alt={`${s.name} product`} />
+      ) : s.logo?.data ? (
+        <div className="startup-logo-art">
+          <span className="startup-logo-halo" />
+          <img src={s.logo.data} alt={`${s.name} logo`} />
+        </div>
       ) : (
         <>
           <div className="product-orbit" />
@@ -413,36 +426,54 @@ function ProductArt({ startup: s, large = false }) {
 }
 function StartupCard({ startup: s, onOpen }) {
   return (
-    <button className="startup-card" onClick={() => onOpen(s)}>
+    <button
+      className="startup-card"
+      onClick={() => onOpen(s)}
+      aria-label={"View details for " + s.name}
+    >
       <ProductArt startup={s} />
       <div className="card-body">
         <div className="card-meta">
-          <span>{s.category}</span>
-          <span className="stage-dot">{s.stage}</span>
+          <span>{s.category || "Expo startup"}</span>
+          <span className="stage-dot">
+            {s.stage || "Selected for the expo"}
+          </span>
         </div>
-        <div className="card-title">
-          <h3>{s.name}</h3>
-          <ArrowUpRight size={21} />
+        <div className="startup-identity">
+          <span className="startup-card-logo">
+            {s.logo?.data ? (
+              <img src={s.logo.data} alt="" />
+            ) : (
+              <Icon name={s.symbol} />
+            )}
+          </span>
+          <div>
+            <h3>{s.name}</h3>
+            {s.organization && (
+              <span className="startup-organization">{s.organization}</span>
+            )}
+          </div>
         </div>
         <p>{s.tagline}</p>
         <div className="card-footer">
           <span className="team-avatar">
             {(s.founderName || s.members?.[0]?.name || s.name).slice(0, 1)}
           </span>
-          <span>
+          <span className="card-founder">
             {s.founderName || s.members?.[0]?.name || "Meet the team"}
           </span>
-          {s.hiring && (
-            <span className="hiring">
-              <span className="dot" /> Open to talent
-            </span>
-          )}
+          <span className="card-details-link">
+            Details <ArrowUpRight size={17} />
+          </span>
         </div>
       </div>
     </button>
   );
 }
-function Home({ startups, onOpen, loading, error }) {
+function Home({ startups: suppliedStartups, onOpen, loading }) {
+  const startups = suppliedStartups.filter(
+    (startup) => startup.status === "Approved" && !startup.isDemo,
+  );
   const [query, setQuery] = useState(""),
     [category, setCategory] = useState("All startups"),
     [filters, setFilters] = useState(false),
@@ -457,6 +488,9 @@ function Home({ startups, onOpen, loading, error }) {
       (!hiring || s.hiring) &&
       [
         s.name,
+        s.tagline,
+        s.founderName,
+        s.organization,
         s.problem,
         s.productDescription,
         s.category,
@@ -553,99 +587,121 @@ function Home({ startups, onOpen, loading, error }) {
             Be part of what comes next.
           </p>
         </div>
-        <div className="discovery-toolbar">
-          <div className="search-box">
-            <Search size={19} />
-            <input
-              aria-label="Search startups"
-              placeholder="Find a startup, idea, or skill…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <kbd>⌕</kbd>
-          </div>
-          <button
-            className={"filter-button " + (filters ? "active" : "")}
-            onClick={() => setFilters(!filters)}
-            aria-expanded={filters}
-          >
-            <SlidersHorizontal size={16} /> Filters{" "}
-            {(stage || product || hiring) && <span className="dot" />}
-            <ChevronDown size={15} />
-          </button>
-        </div>
-        <div className="category-tabs">
-          {["All startups", ...categories].map((c) => (
-            <button
-              key={c}
-              className={category === c ? "selected" : ""}
-              onClick={() => setCategory(c)}
-            >
-              {c === "All startups" && <LayoutGrid size={13} />} {c}
-            </button>
-          ))}
-        </div>
-        {filters && (
-          <div className="filter-panel">
-            <label>
-              Startup stage
-              <select value={stage} onChange={(e) => setStage(e.target.value)}>
-                <option value="">All stages</option>
-                {stages.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Product availability
-              <select
-                value={product}
-                onChange={(e) => setProduct(e.target.value)}
+        {startups.length > 0 && (
+          <>
+            <div className="discovery-toolbar">
+              <div className="search-box">
+                <Search size={19} />
+                <input
+                  aria-label="Search startups"
+                  placeholder="Find a startup, idea, or skill…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+                <kbd>⌕</kbd>
+              </div>
+              <button
+                className={"filter-button " + (filters ? "active" : "")}
+                onClick={() => setFilters(!filters)}
+                aria-expanded={filters}
               >
-                <option value="">All products</option>
-                {[
-                  "Concept only",
-                  "In development",
-                  "Working prototype",
-                  "Live product",
-                ].map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
-            </label>
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={hiring}
-                onChange={(e) => setHiring(e.target.checked)}
-              />{" "}
-              Looking for team members
-            </label>
-            <button
-              className="text-btn"
-              onClick={() => {
-                setStage("");
-                setProduct("");
-                setHiring(false);
-              }}
-            >
-              Reset filters
-            </button>
-          </div>
+                <SlidersHorizontal size={16} /> Filters{" "}
+                {(stage || product || hiring) && <span className="dot" />}
+                <ChevronDown size={15} />
+              </button>
+            </div>
+            <div className="category-tabs">
+              {["All startups", ...categories].map((c) => (
+                <button
+                  key={c}
+                  className={category === c ? "selected" : ""}
+                  onClick={() => setCategory(c)}
+                >
+                  {c === "All startups" && <LayoutGrid size={13} />} {c}
+                </button>
+              ))}
+            </div>
+            {filters && (
+              <div className="filter-panel">
+                <label>
+                  Startup stage
+                  <select
+                    value={stage}
+                    onChange={(e) => setStage(e.target.value)}
+                  >
+                    <option value="">All stages</option>
+                    {stages.map((s) => (
+                      <option key={s}>{s}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Product availability
+                  <select
+                    value={product}
+                    onChange={(e) => setProduct(e.target.value)}
+                  >
+                    <option value="">All products</option>
+                    {[
+                      "Concept only",
+                      "In development",
+                      "Working prototype",
+                      "Live product",
+                    ].map((p) => (
+                      <option key={p}>{p}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={hiring}
+                    onChange={(e) => setHiring(e.target.checked)}
+                  />{" "}
+                  Looking for team members
+                </label>
+                <button
+                  className="text-btn"
+                  onClick={() => {
+                    setStage("");
+                    setProduct("");
+                    setHiring(false);
+                  }}
+                >
+                  Reset filters
+                </button>
+              </div>
+            )}
+            <div className="results-line">
+              <span>
+                {filtered.length.toString().padStart(2, "0")} STARTUPS TO
+                DISCOVER
+              </span>
+              {startups.some((s) => s.isDemo) && (
+                <span className="demo-label">
+                  Preview edition · illustrative demo ventures
+                </span>
+              )}
+            </div>
+          </>
         )}
-        <div className="results-line">
-          <span>
-            {filtered.length.toString().padStart(2, "0")} STARTUPS TO DISCOVER
-          </span>
-          {startups.some((s) => s.isDemo) && (
-            <span className="demo-label">
-              Preview edition · illustrative demo ventures
-            </span>
-          )}
-        </div>
-        <ErrorBox message={error} />
-        {loading ? (
+        {loading && !startups.length ? (
           <Loading />
+        ) : !startups.length ? (
+          <div className="showcase-coming-soon glass">
+            <span className="coming-soon-icon">
+              <Sparkles size={32} />
+            </span>
+            <div className="eyebrow">THE NEXT WAVE IS ON ITS WAY</div>
+            <h3>Coming soon...</h3>
+            <p>
+              New ideas. Fresh perspectives. The startups shaping what’s next
+              will be revealed here.
+            </p>
+            <a href="#register" className="btn btn-primary">
+              Be part of the showcase <ArrowUpRight size={18} />
+            </a>
+          </div>
         ) : filtered.length ? (
           <div className="startup-grid">
             {filtered.map((s) => (
@@ -908,12 +964,46 @@ function StartupDetail({ startup: s, onClose }) {
             </div>
             <div>
               <span className="eyebrow">
-                {s.category} · {s.stage}
+                {[s.category, s.stage].filter(Boolean).join(" · ") ||
+                  "Selected for the expo"}
               </span>
               <h2>{s.name}</h2>
             </div>
           </div>
           <p className="detail-tagline">{s.tagline}</p>
+          <div className="startup-facts">
+            {s.organization && (
+              <div>
+                <span>College / organization</span>
+                <strong>{s.organization}</strong>
+              </div>
+            )}
+            {s.teamSize > 0 && (
+              <div>
+                <span>Team size</span>
+                <strong>
+                  {s.teamSize} {s.teamSize === 1 ? "member" : "members"}
+                </strong>
+              </div>
+            )}
+            <div>
+              <span>Expo stall</span>
+              <strong>{s.stall || "To be assigned"}</strong>
+            </div>
+          </div>
+          {s.display && (
+            <div className="detail-block">
+              <h3>At the expo</h3>
+              <div className="tag-row">
+                {(Array.isArray(s.display) ? s.display : [s.display]).map(
+                  (item) => (
+                    <Tag key={item}>{item}</Tag>
+                  ),
+                )}
+              </div>
+              {s.displayOther && <p>{s.displayOther}</p>}
+            </div>
+          )}
           {s.isDemo && (
             <p className="demo-label">
               Illustrative demo venture · preview content
@@ -954,57 +1044,66 @@ function StartupDetail({ startup: s, onClose }) {
                 </div>
               ),
           )}
-          <div className="detail-block">
-            <h3>Product & prototype</h3>
-            <Tag>{s.productStatus}</Tag>
-            <div className="link-row">
-              {[
-                ["demo", "Explore the product"],
-                ["prototype", "View prototype"],
-                ["video", "Watch the demo"],
-                ["social", "Social profile"],
-              ].map(
-                ([k, l]) =>
-                  s[k] && (
-                    <a key={k} href={s[k]} target="_blank" rel="noreferrer">
-                      {l} <ArrowUpRight size={14} />
-                    </a>
-                  ),
-              )}
-            </div>
-            {s.images?.slice(1).map((im, i) => (
-              <img
-                key={i}
-                className="detail-product-image"
-                src={im.data}
-                alt={`${s.name} product view ${i + 2}`}
-              />
-            ))}
-          </div>
-          <div className="detail-block">
-            <h3>The people behind it</h3>
-            {s.members?.map((m, i) => (
-              <div className="member-row" key={i}>
-                <span className="member-avatar">{m.name[0]}</span>
-                <div>
-                  <strong>{m.name}</strong>
-                  <small>
-                    {m.role} · {m.skills}
-                  </small>
-                </div>
-                {m.profile && (
-                  <a
-                    href={m.profile}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`${m.name}'s profile`}
-                  >
-                    <ArrowUpRight size={17} />
-                  </a>
+          {(s.productStatus ||
+            s.demo ||
+            s.prototype ||
+            s.video ||
+            s.social ||
+            s.images?.length) && (
+            <div className="detail-block">
+              <h3>Product & prototype</h3>
+              {s.productStatus && <Tag>{s.productStatus}</Tag>}
+              <div className="link-row">
+                {[
+                  ["demo", "Explore the product"],
+                  ["prototype", "View prototype"],
+                  ["video", "Watch the demo"],
+                  ["social", "Social profile"],
+                ].map(
+                  ([k, l]) =>
+                    s[k] && (
+                      <a key={k} href={s[k]} target="_blank" rel="noreferrer">
+                        {l} <ArrowUpRight size={14} />
+                      </a>
+                    ),
                 )}
               </div>
-            ))}
-          </div>
+              {s.images?.slice(1).map((im, i) => (
+                <img
+                  key={i}
+                  className="detail-product-image"
+                  src={im.data}
+                  alt={`${s.name} product view ${i + 2}`}
+                />
+              ))}
+            </div>
+          )}
+          {s.members?.length > 0 && (
+            <div className="detail-block">
+              <h3>The people behind it</h3>
+              {s.members?.map((m, i) => (
+                <div className="member-row" key={i}>
+                  <span className="member-avatar">{m.name[0]}</span>
+                  <div>
+                    <strong>{m.name}</strong>
+                    <small>
+                      {[m.role, m.skills].filter(Boolean).join(" · ")}
+                    </small>
+                  </div>
+                  {m.profile && (
+                    <a
+                      href={m.profile}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`${m.name}'s profile`}
+                    >
+                      <ArrowUpRight size={17} />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           {s.hiring && (
             <div className="detail-hiring">
               <div className="eyebrow">
@@ -1034,15 +1133,14 @@ function App() {
     [mobile, setMobile] = useState(false),
     [startups, setStartups] = useState([]),
     [loading, setLoading] = useState(true),
-    [error, setError] = useState(""),
     [selected, setSelected] = useState(null);
   const refresh = () =>
     api("/startups")
-      .then((data) => {
-        setStartups(data);
-        setError("");
+      .then((data) => setStartups(data))
+      .catch(() => {
+        // Keep the showcase quiet while unavailable; retry on focus and polling.
+        // Previously loaded approved profiles remain visible.
       })
-      .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   useEffect(() => {
     refresh();
@@ -1058,8 +1156,17 @@ function App() {
         );
       else window.scrollTo(0, 0);
     };
+    const refreshOnFocus = () => {
+      if (!document.hidden) refresh();
+    };
+    const interval = window.setInterval(refreshOnFocus, 30000);
+    window.addEventListener("focus", refreshOnFocus);
     window.addEventListener("hashchange", fn);
-    return () => window.removeEventListener("hashchange", fn);
+    return () => {
+      window.removeEventListener("hashchange", fn);
+      window.removeEventListener("focus", refreshOnFocus);
+      window.clearInterval(interval);
+    };
   }, []);
   const home = ["home", "explore", "about"].includes(route);
   return (
@@ -1094,19 +1201,15 @@ function App() {
           </button>
         </div>
       </header>
+      <SubmissionRecovery />
       <main>
         {home ? (
-          <Home
-            startups={startups}
-            onOpen={setSelected}
-            loading={loading}
-            error={error}
-          />
+          <Home startups={startups} onOpen={setSelected} loading={loading} />
         ) : route === "register" ? (
           <Registration />
         ) : route === "ideas" ? (
           <IdeaBox />
-        ) : route === "organizer" ? (
+        ) : ["organizer", "admin"].includes(route) ? (
           <Organizer refreshPublic={refresh} />
         ) : route === "status" ? (
           <ApplicationStatus />
@@ -1134,8 +1237,8 @@ function App() {
           </span>
           <div>
             <a href="#status">Application status</a>
-            <a href="#organizer">
-              Organizer access <ArrowUpRight size={12} />
+            <a href="#admin">
+              Admin dashboard <ArrowUpRight size={12} />
             </a>
           </div>
           <span>IMAGINE. BUILD. INSPIRE.</span>
@@ -1152,21 +1255,32 @@ function Field({ field, data, onChange, error }) {
   const [key, label, type, required, options] = field;
   const fieldId = useId();
   const [fileError, setFileError] = useState("");
+  const isDocument = type === "documents";
+  const multiple = type === "files" || isDocument;
   const upload = async (e) => {
     setFileError("");
     const files = [...e.target.files];
-    if (files.length > 3) {
-      setFileError("Choose up to 3 images.");
+    if (!files.length) return;
+    if (files.length > (multiple ? 3 : 1)) {
+      setFileError(multiple ? "Choose up to 3 files." : "Choose one logo.");
       return;
     }
     if (
       files.some(
         (f) =>
-          !["image/png", "image/jpeg", "image/webp"].includes(f.type) ||
-          f.size > 2 * 1024 * 1024,
+          ![
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            ...(isDocument ? ["application/pdf"] : []),
+          ].includes(f.type) || f.size > 2 * 1024 * 1024,
       )
     ) {
-      setFileError("Use PNG, JPEG or WebP images, each under 2 MB.");
+      setFileError(
+        isDocument
+          ? "Use PDF, PNG, JPEG or WebP files, each under 2 MB."
+          : "Use PNG, JPEG or WebP images, each under 2 MB.",
+      );
       return;
     }
     const values = await Promise.all(
@@ -1191,33 +1305,95 @@ function Field({ field, data, onChange, error }) {
     name: key,
     value: data[key] || "",
     onChange: (e) => onChange(key, e.target.value),
+    "aria-required": !!required,
     "aria-invalid": !!error,
     "aria-describedby": error ? fieldId + "-error" : undefined,
   };
+  if (!fieldVisible(key, data)) return null;
+  if (type === "members") {
+    const count = Math.min(99, Math.max(0, Number(data.teamSize) - 1)) || 0;
+    return (
+      <div className="field full team-form">
+        <h3>{label}</h3>
+        {Array.from({ length: count }, (_, index) => (
+          <fieldset className="team-entry" key={index}>
+            <legend className="eyebrow">TEAM MEMBER {index + 2}</legend>
+            <div className="form-grid">
+              {memberFields.map((memberField) => (
+                <Field
+                  key={memberField[0]}
+                  field={memberField}
+                  data={data.members?.[index] || {}}
+                  onChange={(memberKey, value) =>
+                    onChange(
+                      "members",
+                      Array.from({ length: count }, (_, i) =>
+                        i === index
+                          ? { ...data.members?.[i], [memberKey]: value }
+                          : data.members?.[i] || {},
+                      ),
+                    )
+                  }
+                />
+              ))}
+            </div>
+          </fieldset>
+        ))}
+        {error && (
+          <small className="field-error" role="alert">
+            {error}
+          </small>
+        )}
+      </div>
+    );
+  }
   if (type === "boolean")
     return (
-      <label className="toggle-field">
-        <span>{label}</span>
-        <input
-          type="checkbox"
-          checked={!!data[key]}
-          onChange={(e) => onChange(key, e.target.checked)}
-        />
-        <span className="toggle-track" />
-      </label>
+      <div className="field full">
+        <label className="toggle-field" htmlFor={fieldId}>
+          <span>
+            {label} {required && <span>*</span>}
+          </span>
+          <input
+            id={fieldId}
+            type="checkbox"
+            checked={!!data[key]}
+            aria-required={!!required}
+            aria-invalid={!!error}
+            aria-describedby={error ? fieldId + "-error" : undefined}
+            onChange={(e) => onChange(key, e.target.checked)}
+          />
+          <span className="toggle-track" />
+        </label>
+        {error && (
+          <small id={fieldId + "-error"} className="field-error">
+            {error}
+          </small>
+        )}
+      </div>
     );
   return (
     <div
       className={
         "field " +
-        (["textarea", "file", "files", "checks"].includes(type) ? "full" : "")
+        (["textarea", "file", "files", "documents", "checks"].includes(type)
+          ? "full"
+          : "")
       }
     >
       <label htmlFor={fieldId}>
         {label} {required ? <span>*</span> : <small>optional</small>}
       </label>
       {type === "textarea" ? (
-        <textarea {...common} rows={4} maxLength={6000} />
+        <>
+          <textarea {...common} rows={4} maxLength={6000} />
+          {key === "relevantLinks" && (
+            <small>
+              Website, social profile, demo or portfolio — one complete https://
+              link per line.
+            </small>
+          )}
+        </>
       ) : type === "select" ? (
         <select {...common}>
           <option value="">Select an option</option>
@@ -1226,7 +1402,12 @@ function Field({ field, data, onChange, error }) {
           ))}
         </select>
       ) : type === "checks" ? (
-        <div className="check-options">
+        <div
+          className="check-options"
+          role="group"
+          aria-label={label}
+          aria-describedby={error ? fieldId + "-error" : undefined}
+        >
           {options.map((o) => (
             <label key={o}>
               <input
@@ -1245,32 +1426,55 @@ function Field({ field, data, onChange, error }) {
             </label>
           ))}
         </div>
-      ) : ["file", "files"].includes(type) ? (
+      ) : ["file", "files", "documents"].includes(type) ? (
         <div className="upload-box">
           <Upload size={23} />
           <strong>
-            {data[key]
-              ? type === "files"
-                ? data[key].map((f) => f.name).join(", ")
-                : data[key].name
-              : "Choose an image or drop it here"}
+            {isDocument ? "Choose supporting documents" : "Choose startup logo"}
           </strong>
           <small>
-            PNG, JPG or WebP · Up to 2 MB{" "}
-            {type === "files" ? "each · Maximum 3 images" : ""}
+            {isDocument
+              ? "PDF, PNG, JPG or WebP · Up to 2 MB each · Maximum 3 files"
+              : "PNG, JPG or WebP · Up to 2 MB"}
           </small>
           <input
             id={fieldId}
             aria-label={label}
+            aria-required={!!required}
+            aria-invalid={!!error}
             type="file"
-            accept="image/png,image/jpeg,image/webp"
-            multiple={type === "files"}
+            aria-describedby={
+              error || fileError ? fieldId + "-error" : undefined
+            }
+            accept={
+              isDocument
+                ? "application/pdf,image/png,image/jpeg,image/webp"
+                : "image/png,image/jpeg,image/webp"
+            }
+            multiple={multiple}
             onChange={upload}
           />
           {data[key] && (
             <div className="upload-previews">
-              {(type === "files" ? data[key] : [data[key]]).map((f, i) => (
-                <img key={i} src={f.data} alt={f.name} />
+              {(multiple ? data[key] : [data[key]]).map((f, i) => (
+                <div key={i}>
+                  {!isDocument && <img src={f.data} alt={f.name} />}
+                  <span>{f.name}</span>
+                  <button
+                    type="button"
+                    className="text-btn"
+                    aria-label={"Remove " + f.name}
+                    onClick={() => {
+                      onChange(
+                        key,
+                        multiple ? data[key].filter((_, j) => i !== j) : null,
+                      );
+                      setFileError("");
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -1279,6 +1483,7 @@ function Field({ field, data, onChange, error }) {
         <input
           {...common}
           type={type}
+          inputMode={key === "teamSize" ? "numeric" : undefined}
           min={type === "number" ? 1 : undefined}
           max={type === "number" ? 100 : undefined}
           maxLength={type === "text" ? 500 : undefined}
@@ -1291,6 +1496,21 @@ function Field({ field, data, onChange, error }) {
       )}
     </div>
   );
+}
+function TeamReview({ members = [] }) {
+  return members.map((member, index) => (
+    <span className="team-review-member" key={index}>
+      <span>
+        Member {index + 2}: {member.name}
+      </span>
+      <span>
+        {member.phone} · {member.email}
+      </span>
+      <span>
+        {[member.organization, member.role].filter(Boolean).join(" · ")}
+      </span>
+    </span>
+  ));
 }
 function Registration() {
   const [data, setData] = useState(null),
@@ -1317,10 +1537,31 @@ function Registration() {
       current = false;
     };
   }, [data, result]);
-  const change = (k, v) => setData((d) => ({ ...d, [k]: v }));
+  const change = (k, v) => {
+    setData((d) => {
+      const updated = { ...d, [k]: v };
+      if (
+        k === "teamSize" &&
+        /^\d+$/.test(v) &&
+        Number(v) >= 1 &&
+        Number(v) <= 100
+      )
+        updated.members = Array.from(
+          { length: Number(v) - 1 },
+          (_, i) => d.members?.[i] || {},
+        );
+      if (k === "display" && !v.includes("Other")) updated.displayOther = "";
+      return updated;
+    });
+    setErrors((previous) => ({
+      ...previous,
+      [k]: undefined,
+      ...(k === "teamSize" ? { members: undefined } : {}),
+    }));
+  };
   const next = () => {
     const all = validateApplication(data);
-    const keys = step === 5 ? ["members"] : steps[step].fields.map((f) => f[0]);
+    const keys = steps[step].fields.map((f) => f[0]);
     const current = Object.fromEntries(
       Object.entries(all).filter(([k]) => keys.includes(k)),
     );
@@ -1334,9 +1575,7 @@ function Registration() {
     const all = validateApplication(data);
     if (Object.keys(all).length) {
       setErrors(all);
-      const first = steps.findIndex((s, i) =>
-        i === 5 ? !!all.members : s.fields.some((f) => all[f[0]]),
-      );
+      const first = steps.findIndex((s) => s.fields.some((f) => all[f[0]]));
       setStep(Math.max(0, first));
       setError("Please complete the highlighted fields.");
       return;
@@ -1448,7 +1687,8 @@ function Registration() {
         <section className="registration-card glass">
           <div className="form-step-heading">
             <span className="eyebrow">
-              STEP {String(step + 1).padStart(2, "0")} OF 09
+              STEP {String(step + 1).padStart(2, "0")} OF{" "}
+              {String(steps.length).padStart(2, "0")}
             </span>
             <span className="save-indicator">
               <span className="dot" />
@@ -1456,13 +1696,13 @@ function Registration() {
             </span>
           </div>
           <div className="progress-track">
-            <div style={{ width: `${((step + 1) / 9) * 100}%` }} />
+            <div style={{ width: `${((step + 1) / steps.length) * 100}%` }} />
           </div>
           <h2>{steps[step].title}</h2>
           <p className="form-intro">{steps[step].caption}</p>
-          {step === 8 ? (
+          {step === steps.length - 1 ? (
             <div className="review-sections">
-              {steps.slice(0, 8).map((s, i) => (
+              {steps.slice(0, -1).map((s, i) => (
                 <div className="review-section" key={s.title}>
                   <div>
                     <h3>{s.title}</h3>
@@ -1470,113 +1710,52 @@ function Registration() {
                       Edit <ArrowUpRight size={13} />
                     </button>
                   </div>
-                  {i === 5
-                    ? data.members?.map((m, j) => (
-                        <p key={j}>
-                          {m.name} · {m.role} · {m.skills}
-                        </p>
-                      ))
-                    : s.fields.map(([k, l, t]) => (
-                        <div className="review-row" key={k}>
-                          <span>{l}</span>
-                          <strong>
-                            {t === "file"
-                              ? data[k]?.name
-                              : t === "files"
-                                ? data[k]?.map((f) => f.name).join(", ")
-                                : t === "boolean"
-                                  ? data[k]
-                                    ? "Yes"
-                                    : "No"
-                                  : Array.isArray(data[k])
-                                    ? data[k].join(", ")
-                                    : data[k] || "—"}
-                          </strong>
-                        </div>
-                      ))}
+                  {s.fields
+                    .filter(([key]) => fieldVisible(key, data))
+                    .map(([k, l, t]) => (
+                      <div className="review-row" key={k}>
+                        <span>{l}</span>
+                        <strong>
+                          {t === "members" ? (
+                            <TeamReview members={data[k]} />
+                          ) : t === "file" ? (
+                            data[k]?.name
+                          ) : ["files", "documents"].includes(t) ? (
+                            data[k]?.map((f) => f.name).join(", ")
+                          ) : t === "boolean" ? (
+                            data[k] ? (
+                              "Yes"
+                            ) : (
+                              "No"
+                            )
+                          ) : Array.isArray(data[k]) ? (
+                            data[k].join(", ")
+                          ) : (
+                            data[k] || "—"
+                          )}
+                        </strong>
+                      </div>
+                    ))}
                 </div>
               ))}
               <p className="privacy-note">
-                <ShieldCheck size={17} /> Founder contact details and stall
-                requirements stay private. Only your approved startup profile is
-                shared publicly.
+                <ShieldCheck size={17} /> Team contact details, college emails
+                and stall requirements stay private. Accepted profiles show your
+                startup logo, idea, leader and team names, college, and expo
+                display details.
               </p>
-            </div>
-          ) : step === 5 ? (
-            <div className="team-form">
-              {data.members?.map((m, i) => (
-                <div className="team-entry" key={i}>
-                  <div className="team-entry-title">
-                    <span className="eyebrow">TEAM MEMBER {i + 1}</span>
-                    {i > 0 && (
-                      <button
-                        className="icon-btn"
-                        aria-label={`Remove team member ${i + 1}`}
-                        onClick={() =>
-                          change(
-                            "members",
-                            data.members.filter((_, j) => i !== j),
-                          )
-                        }
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-                  <div className="form-grid">
-                    {[
-                      ["name", "Full name"],
-                      ["role", "Role"],
-                      ["skills", "Skills"],
-                      ["profile", "LinkedIn / profile URL"],
-                    ].map(([k, l]) => (
-                      <Field
-                        key={k}
-                        field={[
-                          k,
-                          l,
-                          k === "profile" ? "url" : "text",
-                          k !== "profile",
-                        ]}
-                        data={m}
-                        onChange={(key, v) =>
-                          change(
-                            "members",
-                            data.members.map((member, j) =>
-                              j === i ? { ...member, [key]: v } : member,
-                            ),
-                          )
-                        }
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <Button
-                onClick={() =>
-                  change("members", [
-                    ...data.members,
-                    { name: "", role: "", skills: "", profile: "" },
-                  ])
-                }
-              >
-                <Plus size={16} /> Add team member
-              </Button>
-              <ErrorBox message={errors.members} />
             </div>
           ) : (
             <div className="form-grid">
-              {steps[step].fields
-                .filter((f) => step !== 7 || f[0] === "hiring" || data.hiring)
-                .map((f) => (
-                  <Field
-                    key={f[0]}
-                    field={f}
-                    data={data}
-                    onChange={change}
-                    error={errors[f[0]]}
-                  />
-                ))}
+              {steps[step].fields.map((f) => (
+                <Field
+                  key={f[0]}
+                  field={f}
+                  data={data}
+                  onChange={change}
+                  error={errors[f[0]]}
+                />
+              ))}
             </div>
           )}
           <ErrorBox message={error} />
@@ -1591,7 +1770,7 @@ function Registration() {
               <ArrowLeft size={16} /> Back
             </Button>
             <span className="required-hint">* Required fields</span>
-            {step === 8 ? (
+            {step === steps.length - 1 ? (
               <Button primary disabled={busy} onClick={submit}>
                 {busy ? "Submitting…" : "Submit application"}{" "}
                 <ArrowUpRight size={17} />
@@ -1934,10 +2113,17 @@ function Organizer({ refreshPublic }) {
     [stage, setStage] = useState(""),
     [status, setStatus] = useState(""),
     [selected, setSelected] = useState(null),
-    [confirmDemo, setConfirmDemo] = useState(false);
+    [confirmDemo, setConfirmDemo] = useState(false),
+    [selectedSubmission, setSelectedSubmission] = useState(null),
+    [reviewNotice, setReviewNotice] = useState(""),
+    [lastSynced, setLastSynced] = useState(null);
   const load = () =>
     api("/admin")
-      .then(setData)
+      .then((fresh) => {
+        setData(fresh);
+        setLastSynced(new Date());
+        setError("");
+      })
       .catch((e) => setError(e.message));
   useEffect(() => {
     api("/me")
@@ -1948,6 +2134,18 @@ function Organizer({ refreshPublic }) {
       .catch(() => {})
       .finally(() => setChecked(true));
   }, []);
+  useEffect(() => {
+    if (!user) return;
+    const refresh = () => {
+      if (!document.hidden) load();
+    };
+    const timer = setInterval(refresh, 20000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [user]);
   if (!checked)
     return (
       <div className="page-shell container">
@@ -2024,7 +2222,7 @@ function Organizer({ refreshPublic }) {
   const applications =
     data?.applications.filter(
       (a) =>
-        [a.name, a.founderName, a.id]
+        [a.name, a.founderName, a.email, a.organization, a.id]
           .join(" ")
           .toLowerCase()
           .includes(query.toLowerCase()) &&
@@ -2037,7 +2235,11 @@ function Organizer({ refreshPublic }) {
       <div className="section-heading">
         <div>
           <div className="eyebrow">THE ORGANIZER WORKSPACE</div>
-          <h1>Make possibility happen.</h1>
+          <h1>Submission dashboard.</h1>
+          <p>
+            Review every submission, manage decisions and download complete
+            records.
+          </p>
         </div>
         <Button
           onClick={async () => {
@@ -2052,6 +2254,23 @@ function Organizer({ refreshPublic }) {
         >
           <LogOut size={16} /> Sign out
         </Button>
+      </div>
+      {reviewNotice && (
+        <div className="review-notice" role="status">
+          <CheckCircle2 size={20} />
+          <span>{reviewNotice}</span>
+          <a href="#explore">
+            View homepage <ArrowUpRight size={16} />
+          </a>
+        </div>
+      )}
+      <div className="admin-sync">
+        <span>
+          {lastSynced
+            ? "Last refreshed " + lastSynced.toLocaleTimeString()
+            : "Connecting to submissions…"}
+        </span>
+        <Button onClick={load}>Refresh submissions</Button>
       </div>
       <div className="admin-stats">
         {[
@@ -2149,8 +2368,8 @@ function Organizer({ refreshPublic }) {
               <thead>
                 <tr>
                   <th>Startup / reference</th>
-                  <th>Category</th>
-                  <th>Stage</th>
+                  <th>Team leader</th>
+                  <th>Team size</th>
                   <th>Status</th>
                   <th>Submitted</th>
                   <th />
@@ -2163,8 +2382,11 @@ function Organizer({ refreshPublic }) {
                       <strong>{a.name}</strong>
                       <small>{a.id}</small>
                     </td>
-                    <td>{a.category}</td>
-                    <td>{a.stage}</td>
+                    <td>
+                      {a.founderName}
+                      <small>{a.email}</small>
+                    </td>
+                    <td>{a.teamSize || a.members?.length || "—"}</td>
                     <td>
                       <Tag className={"status-" + a.status.replace(" ", "-")}>
                         {a.status}
@@ -2257,6 +2479,13 @@ function Organizer({ refreshPublic }) {
           <div className="admin-list">
             {data.feedback.map((f) => (
               <div className="glass feedback-item" key={f.id}>
+                <Button
+                  onClick={() =>
+                    setSelectedSubmission({ kind: "feedback", record: f })
+                  }
+                >
+                  View full details <ArrowUpRight size={16} />
+                </Button>
                 <Tag>
                   {data.startups.find((s) => s.id === f.startupId)?.name ||
                     f.startupId}
@@ -2280,6 +2509,13 @@ function Organizer({ refreshPublic }) {
             ))}
             {data.interests.map((i) => (
               <div className="glass feedback-item" key={i.id}>
+                <Button
+                  onClick={() =>
+                    setSelectedSubmission({ kind: "interests", record: i })
+                  }
+                >
+                  View full details <ArrowUpRight size={16} />
+                </Button>
                 <Tag>
                   TEAM INTRODUCTION ·{" "}
                   {data.startups.find((s) => s.id === i.startupId)?.name}
@@ -2368,6 +2604,16 @@ function Organizer({ refreshPublic }) {
           <div className="admin-list">
             {[...data.ideas, ...data.rapid].map((i) => (
               <div className="glass feedback-item" key={i.id}>
+                <Button
+                  onClick={() =>
+                    setSelectedSubmission({
+                      kind: i.mode === "rapid" ? "rapid" : "ideas",
+                      record: i,
+                    })
+                  }
+                >
+                  View full details <ArrowUpRight size={16} />
+                </Button>
                 <Tag>
                   {i.mode === "rapid" ? "Rapid-fire" : "Original idea"} · {i.id}
                 </Tag>
@@ -2397,12 +2643,33 @@ function Organizer({ refreshPublic }) {
           </div>
         </>
       )}
+      {selectedSubmission && (
+        <Modal
+          title="Submission details"
+          onClose={() => setSelectedSubmission(null)}
+          wide
+        >
+          <h2>{selectedSubmission.record.name || "Submission details"}</h2>
+          <SubmissionDownloads
+            kind={selectedSubmission.kind}
+            id={selectedSubmission.record.id}
+          />
+          <SubmissionDetails record={selectedSubmission.record} />
+        </Modal>
+      )}
       {selected && (
         <ApplicationReview
           application={selected}
           stall={data.startups.find((s) => s.id === selected.id)?.stall || ""}
           onClose={() => setSelected(null)}
-          onSaved={() => {
+          onSaved={(status) => {
+            setReviewNotice(
+              status === "Approved"
+                ? "Application accepted. The startup is now live on the homepage."
+                : status === "Rejected"
+                  ? "Application rejected. This startup is not visible on the homepage."
+                  : "Review saved.",
+            );
             setSelected(null);
             load();
             refreshPublic();
@@ -2442,74 +2709,179 @@ function Organizer({ refreshPublic }) {
     </div>
   );
 }
+function SubmissionDownloads({ kind, id }) {
+  const [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  async function download(format) {
+    setError("");
+    setBusy(true);
+    try {
+      const response = await fetch(
+        "/api/admin/submissions/" +
+          kind +
+          "/" +
+          encodeURIComponent(id) +
+          "/export?format=" +
+          format,
+      );
+      if (!response.ok)
+        throw new Error((await response.json()).error || "Download failed.");
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = kind + "-" + id + "." + format;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="submission-downloads">
+      <div className="detail-actions">
+        <Button disabled={busy} onClick={() => download("md")}>
+          <Download size={17} /> Download MD
+        </Button>
+        <Button primary disabled={busy} onClick={() => download("pdf")}>
+          <Download size={17} /> Download PDF
+        </Button>
+      </div>
+      <ErrorBox message={error} />
+    </div>
+  );
+}
+function SubmissionDetails({ record }) {
+  const uploads = Object.entries(record).flatMap(([key, value]) =>
+    (Array.isArray(value) ? value : [value])
+      .filter(isUpload)
+      .map((file) => ({ ...file, label: fieldLabel(key) })),
+  );
+  return (
+    <div className="review-sections submission-details">
+      {submissionSections(record).map((section) => (
+        <section className="review-section" key={section.title}>
+          <h3>{section.title}</h3>
+          <dl>
+            {section.fields.map((field) => (
+              <div className="review-row" key={field.key}>
+                <dt>{field.label}</dt>
+                <dd>{field.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ))}
+      {uploads.length > 0 && (
+        <section className="review-section">
+          <h3>Uploaded files</h3>
+          <div className="submission-uploads">
+            {uploads.map((file, index) => (
+              <a
+                key={index}
+                href={file.data}
+                download={file.name}
+                className="submission-upload"
+              >
+                {file.data.startsWith("data:image/") && (
+                  <img src={file.data} alt={file.label} />
+                )}
+                <span>
+                  {file.label}
+                  <strong>{file.name}</strong>
+                </span>
+                <Download size={18} />
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
 function ApplicationReview({ application: a, stall, onClose, onSaved }) {
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const formId = useId();
+  const accepted = a.status === "Approved";
   return (
     <Modal title={"Review " + a.name} onClose={onClose} wide>
-      <div className="eyebrow">APPLICATION {a.id}</div>
-      <h2>{a.name}</h2>
-      <p>{a.tagline}</p>
-      <div className="review-sections">
-        {steps.slice(0, 8).map((s, i) => (
-          <div className="review-section" key={s.title}>
-            <h3>{s.title}</h3>
-            {i === 5
-              ? a.members.map((m, j) => (
-                  <p key={j}>
-                    {m.name} · {m.role} · {m.skills}{" "}
-                    {m.profile && (
-                      <a href={m.profile} target="_blank" rel="noreferrer">
-                        Profile ↗
-                      </a>
-                    )}
-                  </p>
-                ))
-              : s.fields.map(([k, l, t]) => (
-                  <div className="review-row" key={k}>
-                    <span>{l}</span>
-                    <strong>
-                      {t === "file"
-                        ? a[k] && (
-                            <img
-                              className="review-image"
-                              src={a[k].data}
-                              alt={l}
-                            />
-                          )
-                        : t === "files"
-                          ? a[k]?.map((f, j) => (
-                              <img
-                                key={j}
-                                className="review-image"
-                                src={f.data}
-                                alt={f.name}
-                              />
-                            ))
-                          : t === "boolean"
-                            ? a[k]
-                              ? "Yes"
-                              : "No"
-                            : Array.isArray(a[k])
-                              ? a[k].join(", ")
-                              : a[k] || "—"}
-                    </strong>
-                  </div>
-                ))}
-          </div>
-        ))}
+      <div className="application-review-heading">
+        {a.logo?.data && <img src={a.logo.data} alt={a.name + " logo"} />}
+        <div>
+          <div className="eyebrow">APPLICATION {a.id}</div>
+          <h2>{a.name}</h2>
+          <p>{a.tagline}</p>
+        </div>
       </div>
+      <section className={"publication-panel " + (accepted ? "published" : "")}>
+        <span className="publication-icon">
+          {accepted ? <CheckCircle2 size={24} /> : <ShieldCheck size={24} />}
+        </span>
+        <div>
+          <h3>
+            {accepted
+              ? "Accepted and live on the homepage"
+              : "Ready for the showcase?"}
+          </h3>
+          <p>
+            {accepted
+              ? "Visitors can explore this startup’s logo, idea, display and team details."
+              : "Accept this application to publish its startup profile on the homepage. Contact details and documents stay private."}
+          </p>
+          <div className="publication-actions">
+            {!accepted && (
+              <Button
+                primary
+                type="submit"
+                form={formId}
+                name="decision"
+                value="Approved"
+                disabled={busy}
+              >
+                {" "}
+                {busy ? "Saving…" : "Accept & publish"}{" "}
+                <CheckCircle2 size={17} />
+              </Button>
+            )}
+            {accepted && (
+              <a href="#explore" className="btn btn-primary" onClick={onClose}>
+                View homepage <ArrowUpRight size={17} />
+              </a>
+            )}
+            {a.status !== "Rejected" && (
+              <Button
+                type="submit"
+                form={formId}
+                name="decision"
+                value="Rejected"
+                disabled={busy}
+              >
+                {accepted ? "Remove from homepage" : "Reject application"}
+              </Button>
+            )}
+          </div>
+        </div>
+      </section>
+      <ErrorBox message={error} />
+      <SubmissionDownloads kind="applications" id={a.id} />
+      <SubmissionDetails record={{ ...a, stall: stall || "Not assigned" }} />
       <form
+        id={formId}
         className="review-controls"
         onSubmit={async (e) => {
           e.preventDefault();
+          const fields = Object.fromEntries(new FormData(e.currentTarget));
+          const decision = e.nativeEvent.submitter?.value || fields.status;
           setBusy(true);
+          setError("");
           try {
             await api("/admin/applications/" + a.id, {
               method: "PATCH",
-              body: Object.fromEntries(new FormData(e.target)),
+              body: { ...fields, status: decision },
             });
-            onSaved();
+            onSaved(decision);
           } catch (e) {
             setError(e.message);
           } finally {
@@ -2517,13 +2889,17 @@ function ApplicationReview({ application: a, stall, onClose, onSaved }) {
           }
         }}
       >
-        <h3>Organizer decision</h3>
+        <h3>Review & stall assignment</h3>
         <label>
           Application status
           <select name="status" defaultValue={a.status}>
             {["Draft", "Submitted", "Under Review", "Approved", "Rejected"].map(
-              (s) => (
-                <option key={s}>{s}</option>
+              (status) => (
+                <option key={status} value={status}>
+                  {status === "Approved"
+                    ? "Accepted — visible on homepage"
+                    : status}
+                </option>
               ),
             )}
           </select>
@@ -2542,12 +2918,12 @@ function ApplicationReview({ application: a, stall, onClose, onSaved }) {
           <textarea name="notes" defaultValue={a.notes} rows={4} />
         </label>
         <p className="privacy-note">
-          Approving publishes the startup’s public profile. Contact details and
-          these notes stay private.
+          Accepting publishes the startup’s logo, idea, leader and team names,
+          college, and display details. Emails, phone numbers, uploaded
+          documents, stall requirements and internal notes stay private.
         </p>
-        <ErrorBox message={error} />
-        <Button primary disabled={busy}>
-          {busy ? "Saving…" : "Save decision"} <Check size={16} />
+        <Button primary disabled={busy} type="submit">
+          {busy ? "Saving…" : "Save review"} <Check size={16} />
         </Button>
       </form>
     </Modal>
